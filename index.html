@@ -35,7 +35,6 @@
     line-height: 1.4;
   }
 
-  /* topbar */
   .topbar {
     display: flex;
     align-items: center;
@@ -82,7 +81,6 @@
 
   .refresh-btn:hover { opacity: 0.85; transform: scale(0.97); }
 
-  /* connect banner */
   .connect-banner {
     margin: 28px 28px 20px 28px;
     background: var(--surface);
@@ -137,18 +135,14 @@
     align-items: center;
   }
 
-  #sheet-url {
-    flex: 2;
+  .api-status {
     background: var(--surface2);
-    border: 1px solid var(--border);
     border-radius: 12px;
     padding: 12px 18px;
-    color: var(--text);
     font-size: 13px;
-    outline: none;
+    color: var(--accent2);
+    font-family: monospace;
   }
-
-  #sheet-url:focus { border-color: var(--accent); }
 
   .load-btn, .demo-btn {
     font-family: 'Syne', sans-serif;
@@ -181,7 +175,6 @@
     display: none;
   }
 
-  /* dashboard */
   .dashboard {
     display: none;
     padding: 0 28px 50px 28px;
@@ -380,23 +373,23 @@
 </div>
 
 <div id="connectPanel" class="connect-banner">
-  <h2>📊 Connect your Google Sheet (Form responses)</h2>
-  <p>Paste the public Google Sheets URL (Anyone with link → Viewer). The dashboard will auto‑map columns by question keywords.</p>
+  <h2>📊 SheetDB API Integration</h2>
+  <p>Connected to SheetDB API endpoint. Your survey data is being loaded automatically.</p>
   <div class="steps-grid">
-    <div class="step-card"><strong>Step 1</strong><span>In Google Forms → Responses → Link to Sheets</span></div>
-    <div class="step-card"><strong>Step 2</strong><span>In Sheets: Share → "Anyone with link" → Viewer</span></div>
-    <div class="step-card"><strong>Step 3</strong><span>Copy the spreadsheet URL → paste below</span></div>
-    <div class="step-card"><strong>Step 4</strong><span>Click "Load Data" — magic happens</span></div>
+    <div class="step-card"><strong>✅ Active Connection</strong><span>API: sheetdb.io/api/v1/ca0jew43iy637</span></div>
+    <div class="step-card"><strong>📋 Data Format</strong><span>JSON responses mapped to survey fields</span></div>
+    <div class="step-card"><strong>🔄 Real-time</strong><span>Data refreshes with each load</span></div>
+    <div class="step-card"><strong>📊 Dashboard</strong><span>Auto-generates visualizations</span></div>
   </div>
   <div class="url-panel">
-    <input id="sheetUrl" type="text" placeholder="https://docs.google.com/spreadsheets/d/1ABC123.../edit" />
-    <button class="load-btn" onclick="loadFromSheet()">Load Data</button>
+    <div class="api-status">🔗 API Endpoint Active: ca0jew43iy637</div>
+    <button class="load-btn" onclick="loadFromSheetDB()">Load Data</button>
     <button class="demo-btn" onclick="loadDemoDataset()">✨ Try Demo</button>
   </div>
   <div id="errorMsg"></div>
 </div>
 
-<div id="loadingOverlay" class="loading"><div class="spinner"></div><div>Loading responses ...</div></div>
+<div id="loadingOverlay" class="loading"><div class="spinner"></div><div>Loading responses from SheetDB API ...</div></div>
 
 <div id="dashboardMain" class="dashboard"></div>
 
@@ -404,6 +397,8 @@
   // ======================== GLOBAL HELPERS ========================
   let currentRows = [];
   let chartInstances = {};
+
+  const SHEETDB_API_URL = 'https://sheetdb.io/api/v1/ca0jew43iy637';
 
   function destroyCharts() {
     Object.values(chartInstances).forEach(ch => { if (ch && ch.destroy) ch.destroy(); });
@@ -442,11 +437,21 @@
     container.innerHTML = entries.map(([label, count]) => {
       const percent = total ? Math.round((count / total) * 100) : 0;
       return `<div class="bar-row">
-        <div class="bar-label">${label}</div>
+        <div class="bar-label">${escapeHtml(label)}</div>
         <div class="bar-track"><div class="bar-fill" style="width: ${percent}%; background: ${colorHex};"></div></div>
         <div class="bar-percent">${percent}%</div>
       </div>`;
     }).join('');
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/[&<>]/g, function(m) {
+      if (m === '&') return '&amp;';
+      if (m === '<') return '&lt;';
+      if (m === '>') return '&gt;';
+      return m;
+    });
   }
 
   function createDonutChart(canvasId, labels, data) {
@@ -482,16 +487,70 @@
     });
   }
 
+  // ======================== MAP SHEETDB DATA TO SURVEY FIELDS ========================
+  function mapSheetDBRowToSurvey(row) {
+    // The SheetDB API returns data with column names as keys
+    // We need to map common field names to our Q1-Q26 format
+    const mapped = {};
+    
+    // Try to detect field names case-insensitively
+    Object.keys(row).forEach(key => {
+      const lowerKey = key.toLowerCase();
+      let value = row[key];
+      
+      if (lowerKey.includes('age') || lowerKey === 'q1') mapped.Q1 = value;
+      else if (lowerKey.includes('gender') || lowerKey === 'q2') mapped.Q2 = value;
+      else if (lowerKey.includes('occupation') || lowerKey === 'q3') mapped.Q3 = value;
+      else if (lowerKey.includes('education') || lowerKey === 'q4') mapped.Q4 = value;
+      else if (lowerKey.includes('country') || lowerKey === 'q5') mapped.Q5 = value;
+      else if (lowerKey.includes('reading frequency') || lowerKey.includes('how often') || lowerKey === 'q6') mapped.Q6 = value;
+      else if (lowerKey.includes('books per month') || lowerKey === 'q7') mapped.Q7 = value;
+      else if (lowerKey.includes('reading time') || lowerKey === 'q8') mapped.Q8 = value;
+      else if (lowerKey.includes('where read') || lowerKey === 'q9') mapped.Q9 = value;
+      else if (lowerKey.includes('what time') || lowerKey === 'q10') mapped.Q10 = value;
+      else if (lowerKey.includes('genre') || lowerKey.includes('type of books') || lowerKey === 'q11') mapped.Q11 = value;
+      else if (lowerKey.includes('format') || lowerKey === 'q12') mapped.Q12 = value;
+      else if (lowerKey.includes('language') || lowerKey === 'q13') mapped.Q13 = value;
+      else if (lowerKey.includes('how get books') || lowerKey === 'q14') mapped.Q14 = value;
+      else if (lowerKey.includes('why read') || lowerKey === 'q15') mapped.Q15 = value;
+      else if (lowerKey.includes('motivator') || lowerKey === 'q16') mapped.Q16 = value;
+      else if (lowerKey.includes('notes') || lowerKey === 'q17') mapped.Q17 = value;
+      else if (lowerKey.includes('share') || lowerKey === 'q18') mapped.Q18 = value;
+      else if (lowerKey.includes('barrier') || lowerKey === 'q19') mapped.Q19 = value;
+      else if (lowerKey.includes('distract') || lowerKey === 'q20') mapped.Q20 = value;
+      else if (lowerKey.includes('mobile') || lowerKey === 'q21') mapped.Q21 = value;
+      else if (lowerKey.includes('device') || lowerKey === 'q22') mapped.Q22 = value;
+      else if (lowerKey.includes('physical digital') || lowerKey === 'q23') mapped.Q23 = value;
+      else if (lowerKey.includes('importance') || lowerKey === 'q24') mapped.Q24 = value;
+      else if (lowerKey.includes('improves') || lowerKey === 'q25') mapped.Q25 = value;
+      else if (lowerKey.includes('recommend') || lowerKey === 'q26') mapped.Q26 = value;
+    });
+    
+    // If no direct mapping found, try to use the row as-is with generic keys
+    if (Object.keys(mapped).length === 0) {
+      return {
+        Q1: row.age || row.Age || row['What is your age?'] || '',
+        Q2: row.gender || row.Gender || row['Gender'] || '',
+        Q3: row.occupation || row.Occupation || '',
+        Q4: row.education || row.Education || '',
+        Q6: row.frequency || row.Frequency || row['How often do you read books?'] || '',
+        Q11: row.genres || row.Genres || row['Preferred genres'] || '',
+        Q19: row.barriers || row.Barriers || row['What prevents you from reading more?'] || '',
+      };
+    }
+    
+    return mapped;
+  }
+
   // ======================== CORE RENDER ENGINE ========================
   function renderDashboard(rows) {
-    if (!rows || rows.length === 0) { showError("No valid rows found. Check sheet format."); return; }
+    if (!rows || rows.length === 0) { showError("No valid rows found. Check API data format."); return; }
     currentRows = rows;
     const total = rows.length;
     document.getElementById('respCount').innerHTML = total + ' responses';
     const dashboardDiv = document.getElementById('dashboardMain');
     if (!dashboardDiv) return;
 
-    // Build dynamic dashboard HTML (full structure)
     dashboardDiv.innerHTML = `
       <div class="kpi-grid" id="kpiContainer"></div>
       <div class="section-title">📊 Demographics</div>
@@ -508,7 +567,7 @@
       <div class="chart-card" id="crossTabCard"><table class="cross-table" id="crosstabTable"></table></div>
     `;
 
-    // ---------- KPI calculation ----------
+    // KPI calculation
     const freqMap = computeFrequency(rows, 'Q6');
     const dailyCount = freqMap.get('Daily') || 0;
     const dailyPct = total ? Math.round((dailyCount / total) * 100) : 0;
@@ -522,7 +581,7 @@
     kpiContainer.innerHTML = `
       <div class="kpi-card accent"><div class="kpi-label">TOTAL RESPONSES</div><div class="kpi-value">${total}</div></div>
       <div class="kpi-card teal"><div class="kpi-label">DAILY READERS</div><div class="kpi-value">${dailyPct}%</div></div>
-      <div class="kpi-card red"><div class="kpi-label">TOP BARRIER</div><div class="kpi-value" style="font-size:20px;">${topBarrier.slice(0, 25)}</div></div>
+      <div class="kpi-card red"><div class="kpi-label">TOP BARRIER</div><div class="kpi-value" style="font-size:20px;">${escapeHtml(topBarrier.slice(0, 25))}</div></div>
       <div class="kpi-card purple"><div class="kpi-label">IMPORTANCE (avg)</div><div class="kpi-value">${avgImportance}<span style="font-size:14px;">/5</span></div></div>
     `;
 
@@ -631,95 +690,55 @@
     document.getElementById('crosstabTable').innerHTML = xtabHtml;
   }
 
-  // ======================== CSV & SHEET PARSER (fixed column detection) ========================
-  function extractSheetId(url) {
-    const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
-    return match ? match[1] : null;
-  }
-
-  function parseCSVtoRows(csvText) {
-    const lines = csvText.split(/\r?\n/);
-    if (lines.length < 2) return [];
-    const parseRow = (line) => {
-      const result = []; let cur = ''; let inQuote = false;
-      for (let i = 0; i < line.length; i++) {
-        const c = line[i];
-        if (c === '"') inQuote = !inQuote;
-        else if (c === ',' && !inQuote) { result.push(cur); cur = ''; }
-        else cur += c;
-      }
-      result.push(cur);
-      return result;
-    };
-    const headers = parseRow(lines[0]);
-    const qIndices = {};
-    headers.forEach((h, idx) => {
-      const lower = h.toLowerCase();
-      if (lower.match(/age/i)) qIndices[idx] = 'Q1';
-      else if (lower.match(/gender/i)) qIndices[idx] = 'Q2';
-      else if (lower.match(/occupation/i)) qIndices[idx] = 'Q3';
-      else if (lower.match(/education/i)) qIndices[idx] = 'Q4';
-      else if (lower.match(/country|city/i)) qIndices[idx] = 'Q5';
-      else if (lower.match(/how often|read books/i)) qIndices[idx] = 'Q6';
-      else if (lower.match(/how many books|finish in 1 month/i)) qIndices[idx] = 'Q7';
-      else if (lower.match(/time.*spend|reading daily/i)) qIndices[idx] = 'Q8';
-      else if (lower.match(/where.*read|location/i)) qIndices[idx] = 'Q9';
-      else if (lower.match(/what time.*read/i)) qIndices[idx] = 'Q10';
-      else if (lower.match(/type of books|prefer/i)) qIndices[idx] = 'Q11';
-      else if (lower.match(/format|prefer/i)) qIndices[idx] = 'Q12';
-      else if (lower.match(/language|read/i)) qIndices[idx] = 'Q13';
-      else if (lower.match(/get books|obtain/i)) qIndices[idx] = 'Q14';
-      else if (lower.match(/why.*read|reason/i)) qIndices[idx] = 'Q15';
-      else if (lower.match(/motivates|read more/i)) qIndices[idx] = 'Q16';
-      else if (lower.match(/take notes/i)) qIndices[idx] = 'Q17';
-      else if (lower.match(/share.*reading|experiences/i)) qIndices[idx] = 'Q18';
-      else if (lower.match(/prevents|barrier/i)) qIndices[idx] = 'Q19';
-      else if (lower.match(/platform distracts/i)) qIndices[idx] = 'Q20';
-      else if (lower.match(/mobile devices/i)) qIndices[idx] = 'Q21';
-      else if (lower.match(/device.*use most/i)) qIndices[idx] = 'Q22';
-      else if (lower.match(/physical.*digital|books/i)) qIndices[idx] = 'Q23';
-      else if (lower.match(/important.*reading|life/i)) qIndices[idx] = 'Q24';
-      else if (lower.match(/improves.*life/i)) qIndices[idx] = 'Q25';
-      else if (lower.match(/recommend reading/i)) qIndices[idx] = 'Q26';
-    });
-    const rows = [];
-    for (let i=1;i<lines.length;i++) {
-      if (!lines[i].trim()) continue;
-      const values = parseRow(lines[i]);
-      const row = {};
-      Object.entries(qIndices).forEach(([colIdx, qKey]) => {
-        row[qKey] = values[parseInt(colIdx)] ? values[parseInt(colIdx)].trim() : '';
-      });
-      if (Object.keys(row).length) rows.push(row);
-    }
-    return rows;
-  }
-
-  async function loadFromSheet() {
-    const url = document.getElementById('sheetUrl').value.trim();
+  // ======================== SHEETDB API LOADER ========================
+  async function loadFromSheetDB() {
     const errDiv = document.getElementById('errorMsg');
     errDiv.style.display = 'none';
-    if (!url) { showError("Please enter a valid Google Sheets URL."); return; }
-    const sheetId = extractSheetId(url);
-    if (!sheetId) { showError("Invalid spreadsheet URL. Could not extract ID."); return; }
-    const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=0`;
+    
     document.getElementById('loadingOverlay').style.display = 'block';
     document.getElementById('dashboardMain').style.display = 'none';
     document.getElementById('connectPanel').style.display = 'none';
+    
     try {
-      const res = await fetch(csvUrl);
-      if (!res.ok) throw new Error("Failed to fetch. Check public sharing (Anyone with link → Viewer).");
-      const csvText = await res.text();
-      const parsedRows = parseCSVtoRows(csvText);
-      if (parsedRows.length === 0) throw new Error("No data rows found. Ensure sheet has responses.");
+      console.log('Fetching from SheetDB API:', SHEETDB_API_URL);
+      const response = await fetch(SHEETDB_API_URL);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      console.log('SheetDB response:', data);
+      
+      // Handle different response formats from SheetDB
+      let rows = [];
+      if (Array.isArray(data)) {
+        rows = data;
+      } else if (data.data && Array.isArray(data.data)) {
+        rows = data.data;
+      } else if (data.results && Array.isArray(data.results)) {
+        rows = data.results;
+      } else {
+        throw new Error('Unexpected API response format');
+      }
+      
+      if (rows.length === 0) {
+        throw new Error('No data rows found in the SheetDB endpoint');
+      }
+      
+      // Map each row to our survey format
+      const mappedRows = rows.map(row => mapSheetDBRowToSurvey(row));
+      
       document.getElementById('loadingOverlay').style.display = 'none';
       document.getElementById('dashboardMain').style.display = 'block';
       document.getElementById('connectPanel').style.display = 'none';
-      renderDashboard(parsedRows);
+      renderDashboard(mappedRows);
+      
     } catch(e) {
+      console.error('SheetDB error:', e);
       document.getElementById('loadingOverlay').style.display = 'none';
       document.getElementById('connectPanel').style.display = 'block';
-      showError(e.message || "Sheet error. Make sure it's public and columns match.");
+      showError(`SheetDB Error: ${e.message}. Make sure the endpoint is accessible.`);
     }
   }
 
@@ -768,10 +787,13 @@
   }
 
   window.reloadData = function() {
-    const urlInput = document.getElementById('sheetUrl');
-    if (urlInput && urlInput.value.trim()) loadFromSheet();
-    else loadDemoDataset();
+    loadFromSheetDB();
   };
+  
+  // Auto-load on page start
+  window.addEventListener('DOMContentLoaded', () => {
+    loadFromSheetDB();
+  });
 </script>
 </body>
 </html>
