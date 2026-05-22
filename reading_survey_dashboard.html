@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<title>ReadPulse • Interactive Survey Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  :root {
+    --bg: #0b0d12;
+    --surface: #12161f;
+    --surface2: #1a1f2c;
+    --border: rgba(255, 255, 255, 0.07);
+    --accent: #f7c948;
+    --accent2: #4fd1c5;
+    --accent3: #f97373;
+    --accent4: #b794f4;
+    --text: #f0f2fa;
+    --muted: #6c7283;
+    --muted2: #9ca3b5;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    line-height: 1.4;
+  }
+
+  /* topbar */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 28px;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+    background: rgba(11, 13, 18, 0.92);
+    position: sticky;
+    top: 0;
+    z-index: 110;
+  }
+
+  .logo {
+    font-family: 'Syne', sans-serif;
+    font-weight: 800;
+    font-size: 20px;
+    letter-spacing: -0.3px;
+  }
+
+  .logo span { color: var(--accent); }
+
+  .resp-count {
+    background: var(--surface2);
+    padding: 5px 14px;
+    border-radius: 40px;
+    font-size: 12px;
+    border: 1px solid var(--border);
+    color: var(--muted2);
+  }
+
+  .refresh-btn {
+    background: var(--accent);
+    color: #0b0d12;
+    border: none;
+    font-weight: 700;
+    font-size: 12px;
+    padding: 6px 18px;
+    border-radius: 30px;
+    font-family: 'Syne', sans-serif;
+    cursor: pointer;
+    transition: 0.2s;
+  }
+
+  .refresh-btn:hover { opacity: 0.85; transform: scale(0.97); }
+
+  /* connect banner */
+  .connect-banner {
+    margin: 28px 28px 20px 28px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 24px;
+    padding: 26px 28px;
+  }
+
+  .connect-banner h2 {
+    font-family: 'Syne', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .connect-banner p {
+    color: var(--muted2);
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
+
+  .steps-grid {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 24px;
+  }
+
+  .step-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 12px 16px;
+    flex: 1;
+    min-width: 160px;
+  }
+
+  .step-card strong {
+    font-family: 'Syne', sans-serif;
+    font-size: 11px;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 4px;
+  }
+
+  .step-card span { font-size: 12px; color: var(--muted2); }
+
+  .url-panel {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  #sheet-url {
+    flex: 2;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 18px;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+  }
+
+  #sheet-url:focus { border-color: var(--accent); }
+
+  .load-btn, .demo-btn {
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 13px;
+    padding: 10px 20px;
+    border-radius: 40px;
+    cursor: pointer;
+    transition: 0.2s;
+    border: none;
+  }
+
+  .load-btn {
+    background: var(--accent);
+    color: #0b0d12;
+  }
+
+  .demo-btn {
+    background: transparent;
+    border: 1px solid var(--accent2);
+    color: var(--accent2);
+  }
+
+  .demo-btn:hover { background: rgba(79, 209, 197, 0.1); }
+
+  #error-msg {
+    margin-top: 12px;
+    font-size: 12px;
+    color: var(--accent3);
+    display: none;
+  }
+
+  /* dashboard */
+  .dashboard {
+    display: none;
+    padding: 0 28px 50px 28px;
+  }
+
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin: 28px 0 24px;
+  }
+
+  .kpi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 20px 18px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .kpi-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--muted);
+    font-family: 'Syne', sans-serif;
+  }
+
+  .kpi-value {
+    font-family: 'Syne', sans-serif;
+    font-size: 34px;
+    font-weight: 800;
+    line-height: 1.1;
+    margin-top: 8px;
+  }
+
+  .kpi-card.accent .kpi-value { color: var(--accent); }
+  .kpi-card.teal .kpi-value { color: var(--accent2); }
+  .kpi-card.red .kpi-value { color: var(--accent3); }
+  .kpi-card.purple .kpi-value { color: var(--accent4); }
+
+  .section-title {
+    font-family: 'Syne', sans-serif;
+    font-size: 12px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 32px 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .section-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 18px;
+    margin-bottom: 8px;
+  }
+
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 18px 16px;
+  }
+
+  .chart-title {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted2);
+    margin-bottom: 16px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .bar-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .bar-label {
+    width: 110px;
+    font-size: 12px;
+    color: var(--muted2);
+  }
+
+  .bar-track {
+    flex: 1;
+    height: 6px;
+    background: var(--surface2);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .bar-fill {
+    height: 100%;
+    border-radius: 8px;
+    transition: width 0.4s ease;
+  }
+
+  .bar-percent {
+    width: 38px;
+    text-align: right;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: 'Syne', sans-serif;
+    color: var(--muted);
+  }
+
+  .cross-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .cross-table th {
+    text-align: left;
+    padding: 10px 8px;
+    font-family: 'Syne', sans-serif;
+    font-size: 10px;
+    color: var(--muted);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .cross-table td {
+    padding: 8px 8px;
+    border-bottom: 1px solid var(--border);
+    color: var(--muted2);
+  }
+
+  .cross-table td:first-child {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .badge-percent {
+    display: inline-block;
+    padding: 2px 12px;
+    border-radius: 40px;
+    font-weight: 700;
+    font-size: 11px;
+  }
+
+  .badge-high { background: rgba(247, 201, 72, 0.18); color: var(--accent); }
+  .badge-mid { background: rgba(79, 209, 197, 0.15); color: var(--accent2); }
+  .badge-low { background: rgba(108, 114, 131, 0.2); color: var(--muted2); }
+
+  .loading {
+    text-align: center;
+    padding: 70px 20px;
+    display: none;
+  }
+
+  .spinner {
+    width: 38px;
+    height: 38px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    margin: 0 auto 18px;
+    animation: spin 0.7s linear infinite;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 700px) {
+    .topbar, .dashboard, .connect-banner { padding-left: 16px; padding-right: 16px; }
+    .bar-label { width: 90px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">READ<span>PULSE</span></div>
+  <div style="display: flex; gap: 12px; align-items: center;">
+    <div class="resp-count" id="respCount">— responses</div>
+    <button class="refresh-btn" onclick="reloadData()">↻ Refresh</button>
+  </div>
+</div>
+
+<div id="connectPanel" class="connect-banner">
+  <h2>📊 Connect your Google Sheet (Form responses)</h2>
+  <p>Paste the public Google Sheets URL (Anyone with link → Viewer). The dashboard will auto‑map columns by question keywords.</p>
+  <div class="steps-grid">
+    <div class="step-card"><strong>Step 1</strong><span>In Google Forms → Responses → Link to Sheets</span></div>
+    <div class="step-card"><strong>Step 2</strong><span>In Sheets: Share → "Anyone with link" → Viewer</span></div>
+    <div class="step-card"><strong>Step 3</strong><span>Copy the spreadsheet URL → paste below</span></div>
+    <div class="step-card"><strong>Step 4</strong><span>Click "Load Data" — magic happens</span></div>
+  </div>
+  <div class="url-panel">
+    <input id="sheetUrl" type="text" placeholder="https://docs.google.com/spreadsheets/d/1ABC123.../edit" />
+    <button class="load-btn" onclick="loadFromSheet()">Load Data</button>
+    <button class="demo-btn" onclick="loadDemoDataset()">✨ Try Demo</button>
+  </div>
+  <div id="errorMsg"></div>
+</div>
+
+<div id="loadingOverlay" class="loading"><div class="spinner"></div><div>Loading responses ...</div></div>
+
+<div id="dashboardMain" class="dashboard"></div>
+
+<script>
+  // ======================== GLOBAL HELPERS ========================
+  let currentRows = [];
+  let chartInstances = {};
+
+  function destroyCharts() {
+    Object.values(chartInstances).forEach(ch => { if (ch && ch.destroy) ch.destroy(); });
+    chartInstances = {};
+  }
+
+  function showError(msg) {
+    const errDiv = document.getElementById('errorMsg');
+    errDiv.innerText = msg;
+    errDiv.style.display = 'block';
+    setTimeout(() => { errDiv.style.display = 'none'; }, 4500);
+  }
+
+  function computeFrequency(rows, key) {
+    const map = new Map();
+    rows.forEach(row => {
+      let val = row[key] || '';
+      if (typeof val !== 'string') val = String(val);
+      val.split(',').forEach(part => {
+        let clean = part.trim();
+        if (clean) map.set(clean, (map.get(clean) || 0) + 1);
+      });
+    });
+    return map;
+  }
+
+  function sortedEntries(map, topN = 10) {
+    return Array.from(map.entries()).sort((a,b) => b[1] - a[1]).slice(0, topN);
+  }
+
+  function renderBarList(containerId, map, total, colorHex = '#f7c948') {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    const entries = sortedEntries(map, 8);
+    if (entries.length === 0) { container.innerHTML = '<div style="color:var(--muted2);">No data</div>'; return; }
+    container.innerHTML = entries.map(([label, count]) => {
+      const percent = total ? Math.round((count / total) * 100) : 0;
+      return `<div class="bar-row">
+        <div class="bar-label">${label}</div>
+        <div class="bar-track"><div class="bar-fill" style="width: ${percent}%; background: ${colorHex};"></div></div>
+        <div class="bar-percent">${percent}%</div>
+      </div>`;
+    }).join('');
+  }
+
+  function createDonutChart(canvasId, labels, data) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+    chartInstances[canvasId] = new Chart(ctx, {
+      type: 'doughnut',
+      data: { labels, datasets: [{ data, backgroundColor: ['#f7c948','#4fd1c5','#b794f4','#f97373','#60a5fa','#fb923c','#a3e635','#e879f9'], borderWidth: 0, hoverOffset: 6 }] },
+      options: { responsive: true, maintainAspectRatio: true, cutout: '65%', plugins: { legend: { position: 'right', labels: { boxWidth: 8, font: { size: 10 }, color: '#9ca3b5' } } } }
+    });
+  }
+
+  function createHorizontalBar(canvasId, labels, data, color = '#f7c948') {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+    chartInstances[canvasId] = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets: [{ data, backgroundColor: color, borderRadius: 6, barPercentage: 0.7 }] },
+      options: { indexAxis: 'y', responsive: true, maintainAspectRatio: true, scales: { x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3b5' } }, y: { ticks: { color: '#cbd5e1', font: { size: 10 } } } }, plugins: { legend: { display: false } } }
+    });
+  }
+
+  function createVerticalBar(canvasId, labels, data, color = '#f7c948') {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    if (chartInstances[canvasId]) chartInstances[canvasId].destroy();
+    chartInstances[canvasId] = new Chart(ctx, {
+      type: 'bar',
+      data: { labels, datasets: [{ data, backgroundColor: color, borderRadius: 6 }] },
+      options: { responsive: true, maintainAspectRatio: true, scales: { y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9ca3b5' } }, x: { ticks: { color: '#cbd5e1', font: { size: 10 } } } }, plugins: { legend: { display: false } } }
+    });
+  }
+
+  // ======================== CORE RENDER ENGINE ========================
+  function renderDashboard(rows) {
+    if (!rows || rows.length === 0) { showError("No valid rows found. Check sheet format."); return; }
+    currentRows = rows;
+    const total = rows.length;
+    document.getElementById('respCount').innerHTML = total + ' responses';
+    const dashboardDiv = document.getElementById('dashboardMain');
+    if (!dashboardDiv) return;
+
+    // Build dynamic dashboard HTML (full structure)
+    dashboardDiv.innerHTML = `
+      <div class="kpi-grid" id="kpiContainer"></div>
+      <div class="section-title">📊 Demographics</div>
+      <div class="chart-grid" id="demoGrid"></div>
+      <div class="section-title">📚 Reading Habits</div>
+      <div class="chart-grid" id="habitGrid"></div>
+      <div class="section-title">🎯 Preferences</div>
+      <div class="chart-grid" id="prefGrid"></div>
+      <div class="section-title">🔥 Motivation & Barriers</div>
+      <div class="chart-grid" id="motivGrid"></div>
+      <div class="section-title">📱 Digital Behavior</div>
+      <div class="chart-grid" id="digitalGrid"></div>
+      <div class="section-title">📈 Cross‑tab: Reading Frequency by Age</div>
+      <div class="chart-card" id="crossTabCard"><table class="cross-table" id="crosstabTable"></table></div>
+    `;
+
+    // ---------- KPI calculation ----------
+    const freqMap = computeFrequency(rows, 'Q6');
+    const dailyCount = freqMap.get('Daily') || 0;
+    const dailyPct = total ? Math.round((dailyCount / total) * 100) : 0;
+    const barrierMap = computeFrequency(rows, 'Q19');
+    const topBarrier = sortedEntries(barrierMap, 1)[0]?.[0] || '—';
+    let avgImportance = 0;
+    rows.forEach(r => { const v = parseFloat(r.Q24); if (!isNaN(v)) avgImportance += v; });
+    avgImportance = total ? (avgImportance / total).toFixed(1) : '—';
+    
+    const kpiContainer = document.getElementById('kpiContainer');
+    kpiContainer.innerHTML = `
+      <div class="kpi-card accent"><div class="kpi-label">TOTAL RESPONSES</div><div class="kpi-value">${total}</div></div>
+      <div class="kpi-card teal"><div class="kpi-label">DAILY READERS</div><div class="kpi-value">${dailyPct}%</div></div>
+      <div class="kpi-card red"><div class="kpi-label">TOP BARRIER</div><div class="kpi-value" style="font-size:20px;">${topBarrier.slice(0, 25)}</div></div>
+      <div class="kpi-card purple"><div class="kpi-label">IMPORTANCE (avg)</div><div class="kpi-value">${avgImportance}<span style="font-size:14px;">/5</span></div></div>
+    `;
+
+    // Demographics charts
+    const ageMap = computeFrequency(rows, 'Q1'); const ageEntries = sortedEntries(ageMap);
+    const genderMap = computeFrequency(rows, 'Q2'); const occMap = computeFrequency(rows, 'Q3'); const eduMap = computeFrequency(rows, 'Q4');
+    document.getElementById('demoGrid').innerHTML = `
+      <div class="chart-card"><div class="chart-title">Age groups</div><canvas id="chAge" height="180"></canvas></div>
+      <div class="chart-card"><div class="chart-title">Gender</div><canvas id="chGender" height="180"></canvas></div>
+      <div class="chart-card"><div class="chart-title">Occupation</div><canvas id="chOcc" height="180"></canvas></div>
+      <div class="chart-card"><div class="chart-title">Education</div><canvas id="chEdu" height="180"></canvas></div>
+    `;
+    createHorizontalBar('chAge', ageEntries.map(e=>e[0]), ageEntries.map(e=>e[1]), '#b794f4');
+    createDonutChart('chGender', Array.from(genderMap.keys()), Array.from(genderMap.values()));
+    createHorizontalBar('chOcc', sortedEntries(occMap).map(e=>e[0]), sortedEntries(occMap).map(e=>e[1]), '#4fd1c5');
+    createHorizontalBar('chEdu', sortedEntries(eduMap).map(e=>e[0]), sortedEntries(eduMap).map(e=>e[1]), '#f97373');
+
+    // Habits
+    const freqOrder = ['Daily','Weekly','Monthly','Rarely','Never'];
+    const bpmOrder = ['0','1-2','3-5','6-10','10+'];
+    const timeOrder = ['Less than 15 min','15-30 min','30-60 min','1-2 hours','2+ hours'];
+    const whereMap = computeFrequency(rows, 'Q9');
+    document.getElementById('habitGrid').innerHTML = `
+      <div class="chart-card"><div class="chart-title">Reading frequency</div><canvas id="chFreq" height="170"></canvas></div>
+      <div class="chart-card"><div class="chart-title">Books / month</div><canvas id="chBpm" height="170"></canvas></div>
+      <div class="chart-card"><div class="chart-title">Daily reading time</div><canvas id="chTime" height="170"></canvas></div>
+      <div class="chart-card"><div class="chart-title">Where they read</div><canvas id="chWhere" height="170"></canvas></div>
+    `;
+    const freqCounts = freqOrder.map(k => freqMap.get(k) || 0);
+    const bpmMapFull = computeFrequency(rows, 'Q7');
+    const bpmCounts = bpmOrder.map(k => bpmMapFull.get(k) || 0);
+    const timeMapFull = computeFrequency(rows, 'Q8');
+    const timeCounts = timeOrder.map(k => timeMapFull.get(k) || 0);
+    createVerticalBar('chFreq', freqOrder, freqCounts, '#f7c948');
+    createVerticalBar('chBpm', bpmOrder, bpmCounts, '#4fd1c5');
+    createVerticalBar('chTime', timeOrder.map(t=>t.replace(' min','m').replace(' hours','h')), timeCounts, '#b794f4');
+    createDonutChart('chWhere', Array.from(whereMap.keys()), Array.from(whereMap.values()));
+
+    // Preferences
+    const genresMap = computeFrequency(rows, 'Q11'); const formatMap = computeFrequency(rows, 'Q12'); const langMap = computeFrequency(rows, 'Q13'); const obtainMap = computeFrequency(rows, 'Q14');
+    document.getElementById('prefGrid').innerHTML = `
+      <div class="chart-card"><div class="chart-title">Top Genres</div><div id="genreList" class="bar-list"></div></div>
+      <div class="chart-card"><div class="chart-title">Format</div><canvas id="chFormat" height="170"></canvas></div>
+      <div class="chart-card"><div class="chart-title">Language</div><canvas id="chLang" height="170"></canvas></div>
+      <div class="chart-card"><div class="chart-title">How get books</div><div id="obtainList" class="bar-list"></div></div>
+    `;
+    renderBarList('genreList', genresMap, total, '#f7c948');
+    createDonutChart('chFormat', Array.from(formatMap.keys()), Array.from(formatMap.values()));
+    createDonutChart('chLang', Array.from(langMap.keys()), Array.from(langMap.values()));
+    renderBarList('obtainList', obtainMap, total, '#4fd1c5');
+
+    // Motivation & challenges
+    const whyMap = computeFrequency(rows, 'Q15'); const motivMap = computeFrequency(rows, 'Q16'); const barrierMapFull = computeFrequency(rows, 'Q19'); const distractMap = computeFrequency(rows, 'Q20');
+    document.getElementById('motivGrid').innerHTML = `
+      <div class="chart-card"><div class="chart-title">Why they read</div><div id="whyList" class="bar-list"></div></div>
+      <div class="chart-card"><div class="chart-title">Motivators</div><div id="motivList" class="bar-list"></div></div>
+      <div class="chart-card"><div class="chart-title">Barriers</div><div id="barrierList" class="bar-list"></div></div>
+      <div class="chart-card"><div class="chart-title">Top distraction platform</div><canvas id="chDistract" height="170"></canvas></div>
+    `;
+    renderBarList('whyList', whyMap, total, '#b794f4');
+    renderBarList('motivList', motivMap, total, '#f97373');
+    renderBarList('barrierList', barrierMapFull, total, '#f97373');
+    createDonutChart('chDistract', Array.from(distractMap.keys()), Array.from(distractMap.values()));
+
+    // Digital behavior
+    const notesMap = computeFrequency(rows, 'Q17'); const shareMap = computeFrequency(rows, 'Q18'); const mobileMap = computeFrequency(rows, 'Q21'); const deviceMap = computeFrequency(rows, 'Q22'); const physDigMap = computeFrequency(rows, 'Q23');
+    document.getElementById('digitalGrid').innerHTML = `
+      <div class="chart-card"><div class="chart-title">Take notes</div><canvas id="chNotes" height="150"></canvas></div>
+      <div class="chart-card"><div class="chart-title">Share experiences</div><canvas id="chShare" height="150"></canvas></div>
+      <div class="chart-card"><div class="chart-title">Reads on mobile</div><canvas id="chMobile" height="150"></canvas></div>
+      <div class="chart-card"><div class="chart-title">Main device</div><canvas id="chDevice" height="150"></canvas></div>
+      <div class="chart-card"><div class="chart-title">Physical vs Digital</div><canvas id="chPhysDig" height="150"></canvas></div>
+      <div class="chart-card"><div class="chart-title">Reading improves life?</div><canvas id="chImprove" height="150"></canvas></div>
+    `;
+    createDonutChart('chNotes', Array.from(notesMap.keys()), Array.from(notesMap.values()));
+    createDonutChart('chShare', Array.from(shareMap.keys()), Array.from(shareMap.values()));
+    createDonutChart('chMobile', Array.from(mobileMap.keys()), Array.from(mobileMap.values()));
+    createDonutChart('chDevice', Array.from(deviceMap.keys()), Array.from(deviceMap.values()));
+    createDonutChart('chPhysDig', Array.from(physDigMap.keys()), Array.from(physDigMap.values()));
+    const improveMap = computeFrequency(rows, 'Q25');
+    createHorizontalBar('chImprove', Array.from(improveMap.keys()), Array.from(improveMap.values()), '#60a5fa');
+
+    // Cross-tab: age vs reading frequency
+    const ageGroups = ['Under 15','15-18','19-25','26-35','36-45','46+'];
+    const freqGroups = ['Daily','Weekly','Monthly','Rarely','Never'];
+    const matrix = {};
+    rows.forEach(r => {
+      let age = r.Q1 || 'Other'; let freq = r.Q6 || 'Other';
+      if (!matrix[age]) matrix[age] = {};
+      matrix[age][freq] = (matrix[age][freq] || 0) + 1;
+    });
+    let xtabHtml = '<thead><tr><th>Age \ Frequency</th>' + freqGroups.map(f => `<th>${f}</th>`).join('') + '<th>Total</th></tr></thead><tbody>';
+    ageGroups.forEach(age => {
+      if (!matrix[age]) return;
+      const rowTotal = Object.values(matrix[age]).reduce((a,b)=>a+b,0);
+      xtabHtml += `<tr><td>${age}</td>`;
+      freqGroups.forEach(freq => {
+        let val = matrix[age][freq] || 0;
+        let percent = rowTotal ? Math.round((val/rowTotal)*100) : 0;
+        let badgeClass = percent >= 40 ? 'badge-high' : (percent >= 18 ? 'badge-mid' : 'badge-low');
+        xtabHtml += `<td><span class="badge-percent ${badgeClass}">${percent}%</span></td>`;
+      });
+      xtabHtml += `<td style="color:var(--muted2);">${rowTotal}</td></tr>`;
+    });
+    xtabHtml += '</tbody>';
+    document.getElementById('crosstabTable').innerHTML = xtabHtml;
+  }
+
+  // ======================== CSV & SHEET PARSER (fixed column detection) ========================
+  function extractSheetId(url) {
+    const match = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    return match ? match[1] : null;
+  }
+
+  function parseCSVtoRows(csvText) {
+    const lines = csvText.split(/\r?\n/);
+    if (lines.length < 2) return [];
+    const parseRow = (line) => {
+      const result = []; let cur = ''; let inQuote = false;
+      for (let i = 0; i < line.length; i++) {
+        const c = line[i];
+        if (c === '"') inQuote = !inQuote;
+        else if (c === ',' && !inQuote) { result.push(cur); cur = ''; }
+        else cur += c;
+      }
+      result.push(cur);
+      return result;
+    };
+    const headers = parseRow(lines[0]);
+    const qIndices = {};
+    headers.forEach((h, idx) => {
+      const lower = h.toLowerCase();
+      if (lower.match(/age/i)) qIndices[idx] = 'Q1';
+      else if (lower.match(/gender/i)) qIndices[idx] = 'Q2';
+      else if (lower.match(/occupation/i)) qIndices[idx] = 'Q3';
+      else if (lower.match(/education/i)) qIndices[idx] = 'Q4';
+      else if (lower.match(/country|city/i)) qIndices[idx] = 'Q5';
+      else if (lower.match(/how often|read books/i)) qIndices[idx] = 'Q6';
+      else if (lower.match(/how many books|finish in 1 month/i)) qIndices[idx] = 'Q7';
+      else if (lower.match(/time.*spend|reading daily/i)) qIndices[idx] = 'Q8';
+      else if (lower.match(/where.*read|location/i)) qIndices[idx] = 'Q9';
+      else if (lower.match(/what time.*read/i)) qIndices[idx] = 'Q10';
+      else if (lower.match(/type of books|prefer/i)) qIndices[idx] = 'Q11';
+      else if (lower.match(/format|prefer/i)) qIndices[idx] = 'Q12';
+      else if (lower.match(/language|read/i)) qIndices[idx] = 'Q13';
+      else if (lower.match(/get books|obtain/i)) qIndices[idx] = 'Q14';
+      else if (lower.match(/why.*read|reason/i)) qIndices[idx] = 'Q15';
+      else if (lower.match(/motivates|read more/i)) qIndices[idx] = 'Q16';
+      else if (lower.match(/take notes/i)) qIndices[idx] = 'Q17';
+      else if (lower.match(/share.*reading|experiences/i)) qIndices[idx] = 'Q18';
+      else if (lower.match(/prevents|barrier/i)) qIndices[idx] = 'Q19';
+      else if (lower.match(/platform distracts/i)) qIndices[idx] = 'Q20';
+      else if (lower.match(/mobile devices/i)) qIndices[idx] = 'Q21';
+      else if (lower.match(/device.*use most/i)) qIndices[idx] = 'Q22';
+      else if (lower.match(/physical.*digital|books/i)) qIndices[idx] = 'Q23';
+      else if (lower.match(/important.*reading|life/i)) qIndices[idx] = 'Q24';
+      else if (lower.match(/improves.*life/i)) qIndices[idx] = 'Q25';
+      else if (lower.match(/recommend reading/i)) qIndices[idx] = 'Q26';
+    });
+    const rows = [];
+    for (let i=1;i<lines.length;i++) {
+      if (!lines[i].trim()) continue;
+      const values = parseRow(lines[i]);
+      const row = {};
+      Object.entries(qIndices).forEach(([colIdx, qKey]) => {
+        row[qKey] = values[parseInt(colIdx)] ? values[parseInt(colIdx)].trim() : '';
+      });
+      if (Object.keys(row).length) rows.push(row);
+    }
+    return rows;
+  }
+
+  async function loadFromSheet() {
+    const url = document.getElementById('sheetUrl').value.trim();
+    const errDiv = document.getElementById('errorMsg');
+    errDiv.style.display = 'none';
+    if (!url) { showError("Please enter a valid Google Sheets URL."); return; }
+    const sheetId = extractSheetId(url);
+    if (!sheetId) { showError("Invalid spreadsheet URL. Could not extract ID."); return; }
+    const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv&gid=0`;
+    document.getElementById('loadingOverlay').style.display = 'block';
+    document.getElementById('dashboardMain').style.display = 'none';
+    document.getElementById('connectPanel').style.display = 'none';
+    try {
+      const res = await fetch(csvUrl);
+      if (!res.ok) throw new Error("Failed to fetch. Check public sharing (Anyone with link → Viewer).");
+      const csvText = await res.text();
+      const parsedRows = parseCSVtoRows(csvText);
+      if (parsedRows.length === 0) throw new Error("No data rows found. Ensure sheet has responses.");
+      document.getElementById('loadingOverlay').style.display = 'none';
+      document.getElementById('dashboardMain').style.display = 'block';
+      document.getElementById('connectPanel').style.display = 'none';
+      renderDashboard(parsedRows);
+    } catch(e) {
+      document.getElementById('loadingOverlay').style.display = 'none';
+      document.getElementById('connectPanel').style.display = 'block';
+      showError(e.message || "Sheet error. Make sure it's public and columns match.");
+    }
+  }
+
+  function loadDemoDataset() {
+    document.getElementById('loadingOverlay').style.display = 'block';
+    document.getElementById('dashboardMain').style.display = 'none';
+    document.getElementById('connectPanel').style.display = 'none';
+    setTimeout(() => {
+      const demoRows = [];
+      const demoCount = 285;
+      const ages = ['Under 15','15-18','19-25','26-35','36-45','46+'];
+      const genders = ['Male','Female','Female','Female','Prefer not to say'];
+      for (let i=0; i<demoCount; i++) {
+        let row = {
+          Q1: ages[Math.floor(Math.random()*ages.length)],
+          Q2: genders[Math.floor(Math.random()*genders.length)],
+          Q3: Math.random()>0.6?'Student':(Math.random()>0.5?'Professional':'Teacher'),
+          Q4: Math.random()>0.5?'Bachelor Degree':'Master Degree',
+          Q6: Math.random()>0.4?'Daily':(Math.random()>0.6?'Weekly':'Monthly'),
+          Q7: Math.random()>0.6?'1-2':(Math.random()>0.5?'3-5':'0'),
+          Q8: ['15-30 min','30-60 min','Less than 15 min'][Math.floor(Math.random()*3)],
+          Q9: 'Home',
+          Q11: 'Fiction,Self-help',
+          Q12: 'Printed books',
+          Q13: 'English',
+          Q14: 'Buy online',
+          Q15: 'Knowledge,Relaxation',
+          Q16: 'Interesting topic',
+          Q17: 'Sometimes',
+          Q18: 'Yes',
+          Q19: 'No time',
+          Q20: 'TikTok',
+          Q21: 'Yes',
+          Q22: 'Phone',
+          Q23: 'Both',
+          Q24: String(3+Math.floor(Math.random()*3)),
+          Q25: 'Agree',
+        };
+        demoRows.push(row);
+      }
+      document.getElementById('loadingOverlay').style.display = 'none';
+      document.getElementById('dashboardMain').style.display = 'block';
+      document.getElementById('connectPanel').style.display = 'none';
+      renderDashboard(demoRows);
+    }, 400);
+  }
+
+  window.reloadData = function() {
+    const urlInput = document.getElementById('sheetUrl');
+    if (urlInput && urlInput.value.trim()) loadFromSheet();
+    else loadDemoDataset();
+  };
+</script>
+</body>
+</html>
